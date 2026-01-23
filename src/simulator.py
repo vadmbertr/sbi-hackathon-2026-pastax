@@ -37,23 +37,23 @@ def dynamical_model(
         return beta_w * sanitize(vu)
     
     latitude, longitude = y
-    gridded_duacs, gridded_era5 = args
+    gridded_currents, gridded_wind = args
     beta_e, theta_e, beta_w = params    
 
-    duacs_vu = interp(gridded_duacs, ("v", "u"), t, latitude, longitude)
-    era5_tytx_vu = interp(gridded_era5, ("ty", "tx", "v", "u"), t, latitude, longitude)
+    currents_vu = interp(gridded_currents, ("v", "u"), t, latitude, longitude)
+    wind_tytx_vu = interp(gridded_wind, ("ty", "tx", "v", "u"), t, latitude, longitude)
 
-    dlatlon = geostrophy(duacs_vu) + ekman(era5_tytx_vu[:2], latitude) + leeway(era5_tytx_vu[2:])
+    dlatlon = geostrophy(currents_vu) + ekman(wind_tytx_vu[:2], latitude) + leeway(wind_tytx_vu[2:])
     
-    if gridded_duacs.is_spherical_mesh and not gridded_duacs.use_degrees:
+    if gridded_currents.is_spherical_mesh and not gridded_currents.use_degrees:
         dlatlon = meters_to_degrees(dlatlon, latitude=latitude)
 
     return dlatlon
 
 
 def simulate_trajectories(
-    duacs_ds: xr.Dataset,
-    era5_ds: xr.Dataset,
+    currents_ds: xr.Dataset,
+    wind_ds: xr.Dataset,
     x0: Float[Array, "2"],  # lon, lat
     ts: Float[Array, "T"],  # timestamps
     sampled_parameters: Float[Array, "N 3"]
@@ -61,13 +61,13 @@ def simulate_trajectories(
     simulator = DeterministicSimulator()
     dt0 = 15 * 60  # 15 minutes in seconds
 
-    gridded_duacs = Gridded.from_xarray(
-        duacs_ds, 
-        fields={"u": "ugos", "v": "vgos"},
+    gridded_currents = Gridded.from_xarray(
+        currents_ds, 
+        fields={"u": "ucos", "v": "vcos"},
         coordinates={"time": "time", "latitude": "latitude", "longitude": "longitude"}
     )
-    gridded_era5 = Gridded.from_xarray(
-        era5_ds, 
+    gridded_wind = Gridded.from_xarray(
+        wind_ds, 
         fields={
             "tx": "eastward_stress", "ty": "northward_stress",
             "u": "eastward_wind", "v": "northward_wind"
@@ -76,13 +76,13 @@ def simulate_trajectories(
     )
 
     x0 = Location(jnp.asarray(x0)[::-1])  # convert to (lat, lon)
-    ts = jnp.asarray(ts.astype("datetime64[s]").astype(np.float64))
+    ts = jnp.asarray(ts.astype("datetime64[s]").astype(np.int64))  # convert to seconds since epoch
     sampled_parameters = jnp.asarray(sampled_parameters)
 
     def simulate_single_params(params: Float[Array, "3"]):
         dynamics = lambda t, y, args: dynamical_model(t, y, args, params)
 
-        trajectory = simulator(dynamics=dynamics, args=(gridded_duacs, gridded_era5), x0=x0, ts=ts, dt0=dt0)
+        trajectory = simulator(dynamics=dynamics, args=(gridded_currents, gridded_wind), x0=x0, ts=ts, dt0=dt0)
         latlon = trajectory.locations.value
 
         return latlon
