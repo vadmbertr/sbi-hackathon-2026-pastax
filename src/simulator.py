@@ -15,7 +15,7 @@ def sanitize(arr):
 
 
 def dynamical_model(
-    t: Real[Array, ""], y: Float[Array, "2"], args: (Gridded, Gridded), params: Float[Array, "4"]
+    t: Real[Array, ""], y: Float[Array, "2"], args: (Gridded, Gridded), params: Float[Array, "3"]
 ) -> Float[Array, "2"]:
     def interp(field, variables, t, lat, lon):
         uv_dict = field.interp(*variables, time=t, latitude=lat, longitude=lon)
@@ -34,18 +34,11 @@ def dynamical_model(
         return sanitize(vu)
 
     def leeway(vu):
-        downwind = vu
-        crosswind = (downwind[1] + 1j * downwind[0]) * jnp.exp(-1j * jnp.deg2rad(90))
-        crosswind = jnp.array([crosswind.imag, crosswind.real])
-
-        vu = downwind * beta_w[0] + crosswind * beta_w[1]
-
-        return sanitize(vu)
+        return beta_w * sanitize(vu)
     
     latitude, longitude = y
     gridded_currents, gridded_wind = args
-    beta_e, theta_e = params[:2]
-    beta_w = params[2:]
+    beta_e, theta_e, beta_w = params
 
     currents_vu = interp(gridded_currents, ("v", "u"), t, latitude, longitude)
     wind_tytx_vu = interp(gridded_wind, ("ty", "tx", "v", "u"), t, latitude, longitude)
@@ -63,7 +56,7 @@ def simulate_trajectories(
     wind_ds: xr.Dataset,
     x0: Float[Array, "2"],  # lon, lat
     ts: Float[Array, "T"],  # timestamps
-    sampled_parameters: Float[Array, "N 5"]
+    sampled_parameters: Float[Array, "N 3"]
 ):
     simulator = DeterministicSimulator()
     dt0 = 15 * 60  # 15 minutes in seconds
