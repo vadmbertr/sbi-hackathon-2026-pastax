@@ -34,18 +34,11 @@ def dynamical_model(
         return sanitize(vu)
 
     def leeway(vu):
-        downwind = vu
-        crosswind = (downwind[1] + 1j * downwind[0]) * jnp.exp(-1j * jnp.deg2rad(90))
-        crosswind = jnp.array([crosswind.imag, crosswind.real])
-
-        vu = downwind * beta_w[0] + crosswind * beta_w[1]
-
-        return sanitize(vu)
+        return beta_w * sanitize(vu)
     
     latitude, longitude = y
     gridded_currents, gridded_wind = args
-    beta_e, theta_e = params[:2]
-    beta_w = params[2:]
+    beta_e, theta_e, beta_w = params
 
     currents_vu = interp(gridded_currents, ("v", "u"), t, latitude, longitude)
     wind_tytx_vu = interp(gridded_wind, ("ty", "tx", "v", "u"), t, latitude, longitude)
