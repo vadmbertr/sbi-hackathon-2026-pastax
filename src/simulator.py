@@ -15,7 +15,7 @@ def sanitize(arr):
 
 
 def dynamical_model(
-    t: Real[Array, ""], y: Float[Array, "2"], args: (Gridded, Gridded), params: Float[Array, "4"]
+    t: Real[Array, ""], y: Float[Array, "2"], args: (Gridded, Gridded), params: Float[Array, "3"]
 ) -> Float[Array, "2"]:
     def interp(field, variables, t, lat, lon):
         uv_dict = field.interp(*variables, time=t, latitude=lat, longitude=lon)
@@ -56,7 +56,7 @@ def simulate_trajectories(
     wind_ds: xr.Dataset,
     x0: Float[Array, "2"],  # lon, lat
     ts: Float[Array, "T"],  # timestamps
-    sampled_parameters: Float[Array, "N 5"]
+    sampled_parameters: Float[Array, "N 3"]
 ):
     simulator = DeterministicSimulator()
     dt0 = 15 * 60  # 15 minutes in seconds
